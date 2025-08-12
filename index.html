@@ -1,0 +1,2609 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Asteroid Miner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: monospace;
+      color: #0f0;
+      touch-action: none;
+      user-select: none;
+    }
+    canvas {
+      display: block;
+      background: #000;
+      cursor: crosshair;
+    }
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      font-size: 2em;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 9999;
+    }
+    #info {
+      position: fixed;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(0,255,255,0.85);
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      z-index: 100;
+      text-shadow: 0 0 8px rgba(0,255,255,0.6);
+      background: linear-gradient(135deg, rgba(0,50,100,0.1), rgba(0,100,150,0.05));
+      padding: 6px 20px;
+      border: 1px solid rgba(0,255,255,0.2);
+      border-radius: 3px;
+      backdrop-filter: blur(2px);
+      box-shadow: 0 0 15px rgba(0,255,255,0.1);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #powerUpDisplay {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 100;
+    }
+    .power-up-indicator {
+      background: rgba(0,0,0,0.7);
+      border: 1px solid;
+      border-radius: 4px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      backdrop-filter: blur(2px);
+      animation: powerUpPulse 2s ease-in-out infinite;
+    }
+    .power-up-indicator.critical {
+      animation: powerUpCritical 0.5s infinite;
+    }
+    @keyframes powerUpCritical {
+      0%, 100% { 
+        background: rgba(50, 0, 0, 0.9);
+        box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+        border-color: #ff4444;
+      }
+      50% { 
+        background: rgba(0, 0, 0, 0.7);
+        box-shadow: 0 0 5px currentColor;
+        border-color: currentColor;
+      }
+    }
+    .power-up-icon {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+    .power-up-time {
+      color: #ffffff;
+      font-weight: bold;
+      min-width: 20px;
+      text-align: center;
+    }
+    @keyframes powerUpPulse {
+      0%, 100% { 
+        box-shadow: 0 0 5px currentColor; 
+      }
+      50% { 
+        box-shadow: 0 0 15px currentColor; 
+      }
+    }
+    #info > div {
+      white-space: nowrap;
+    }
+    #pilot {
+      color: rgba(255,255,255,0.7);
+      font-size: 10px;
+    }
+    #shieldDisplay {
+      display: inline-flex;
+      gap: 2px;
+      align-items: center;
+      margin-left: 4px;
+    }
+    .shield-segment {
+      width: 8px;
+      height: 12px;
+      border: 1px solid rgba(0,170,255,0.4);
+      background: linear-gradient(to top, #00aaff, #0088cc);
+      box-shadow: 0 0 4px rgba(0,170,255,0.6);
+      transition: all 0.3s ease;
+    }
+    .shield-segment.damaged {
+      background: transparent;
+      border-color: rgba(255,0,0,0.3);
+      box-shadow: none;
+    }
+    .shield-segment.critical {
+      animation: shieldCritical 0.5s infinite;
+    }
+    @keyframes shieldCritical {
+      0%, 100% { 
+        background: linear-gradient(to top, #ff0000, #cc0000);
+        box-shadow: 0 0 6px rgba(255,0,0,0.8);
+      }
+      50% { 
+        background: linear-gradient(to top, #ff4444, #ff0000);
+        box-shadow: 0 0 10px rgba(255,0,0,1);
+      }
+    }
+    #gameOverScreen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      background: rgba(0,0,0,0);
+      transition: background 2s ease;
+    }
+    #gameOverScreen.fade-in {
+      background: rgba(0,0,0,0.8);
+    }
+    #gameOverContent {
+      text-align: center;
+      color: #ff4444;
+      font-family: 'Courier New', monospace;
+      opacity: 0;
+      transform: translateY(50px);
+      transition: opacity 1s ease, transform 1s ease;
+      background: rgba(0,0,0,0.7);
+      padding: 40px;
+      border: 2px solid rgba(255,68,68,0.5);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+    }
+    #gameOverContent.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #warningOverlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      pointer-events: none;
+    }
+    #warningContent {
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      background: rgba(0,0,0,0.4);
+      padding: 20px 30px;
+      border-radius: 8px;
+      backdrop-filter: blur(5px);
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+    }
+    #warningContent.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    #warningContent.hull-breach {
+      color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.3);
+      box-shadow: 0 0 15px rgba(255,255,255,0.2);
+    }
+    #warningContent.laser-tutorial {
+      color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.2);
+    }
+    #warningContent.black-hole {
+      color: rgba(255,100,255,0.9);
+      border: 1px solid rgba(255,100,255,0.3);
+      box-shadow: 0 0 15px rgba(255,100,255,0.2);
+    }
+    #warningContent.civilian-destroyed {
+      color: rgba(255,100,100,0.9);
+      border: 1px solid rgba(255,100,100,0.3);
+      box-shadow: 0 0 15px rgba(255,100,100,0.2);
+    }
+    #warningContent.planet-mined {
+      color: rgba(100,255,100,0.9);
+      border: 1px solid rgba(100,255,100,0.3);
+      box-shadow: 0 0 15px rgba(100,255,100,0.2);
+    }
+    #warningTitle {
+      font-size: 1.8em;
+      font-weight: bold;
+      margin-bottom: 5px;
+      text-shadow: 0 0 10px currentColor;
+    }
+    #warningSubtext {
+      font-size: 1em;
+      opacity: 0.8;
+    }
+    #missionStatus {
+      font-size: 3em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-shadow: 0 0 20px rgba(255,68,68,0.8);
+    }
+    #finalScore {
+      font-size: 1.5em;
+      margin-bottom: 30px;
+      color: #ffaa00;
+      text-shadow: 0 0 10px rgba(255,170,0,0.8);
+    }
+    #restartMessage {
+      font-size: 1.2em;
+      color: #00ff00;
+      text-shadow: 0 0 10px rgba(0,255,0,0.8);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="startOverlay">Tap to Start Mining</div>
+  <div id="info">
+    <div id="score">CARGO: 0</div>
+    <div id="status">SYS: <span style="color: #00ff00;">OK</span></div>
+    <div id="pilot">PILOT: ΞΩ-7 ◊ZARAK◊</div>
+    <div id="shield">HULL: <div id="shieldDisplay">
+      <div class="shield-segment"></div>
+      <div class="shield-segment"></div>
+      <div class="shield-segment"></div>
+    </div></div>
+  </div>
+  <div id="powerUpDisplay"></div>
+  <div id="gameOverScreen" style="display: none;">
+    <div id="gameOverContent">
+      <div id="missionStatus">MISSION TERMINATED</div>
+      <div id="finalScore">FINAL CARGO: 0</div>
+      <div id="restartMessage">TAP TO RESTART MISSION</div>
+    </div>
+  </div>
+  <div id="warningOverlay" style="display: none;">
+    <div id="warningContent">
+      <div id="warningTitle"></div>
+      <div id="warningSubtext"></div>
+    </div>
+  </div>
+
+
+  <script>
+    // === POWER-UP SYSTEM ===
+    const PowerUpTypes = {
+      SHIELD_REPAIR: {
+        name: 'Shield Repair',
+        color: '#00ff00',
+        glow: '#44ff44',
+        icon: '🛡️',
+        effect: 'repair'
+      },
+      RAPID_FIRE: {
+        name: 'Laser Beam',
+        color: '#ff4400',
+        glow: '#ff8844',
+        icon: '⚡',
+        effect: 'rapid',
+        duration: 10000
+      },
+      SCORE_MULTIPLIER: {
+        name: 'Score Multiplier',
+        color: '#ffdd00',
+        glow: '#ffee44',
+        icon: '💎',
+        effect: 'multiplier',
+        duration: 20000
+      },
+      PIERCING_SHOT: {
+        name: 'Piercing Shot',
+        color: '#ff00ff',
+        glow: '#ff44ff',
+        icon: '🔫',
+        effect: 'piercing',
+        duration: 12000
+      }
+    };
+
+
+    // === GAME STATE MANAGEMENT ===
+    class GameState {
+      constructor() {
+        this.reset();
+      }
+      
+      reset() {
+        this.score = 0;
+        this.shield = 100;
+        this.gameActive = true;
+        this.currentBeat = 0;
+        this.scoreFlash = '';
+        this.scoreFlashTimer = 0;
+        this.hullWarningShown = false;
+        this.lastWarningTime = 0;
+        this.activePowerUps = {};
+        this.scoreMultiplier = 1;
+        this.laserBeam = { active: false, x: 0, y: 0, lastFire: 0 };
+        this.laserSound = null;
+        this.blackHoleSound = null;
+        this.laserTutorialShown = false;
+        this.blackHole = { active: false, x: 0, y: 0, z: 0, phase: 0, duration: 0, lastSpawn: 0 };
+        this.updateUI();
+        this.updatePowerUpUI(); // Clear power-up display
+      }
+      
+      updateUI() {
+        const scoreEl = document.getElementById('score');
+        const shieldEl = document.getElementById('shieldPercent');
+        const statusEl = document.getElementById('status').querySelector('span');
+        
+        if (scoreEl) {
+          scoreEl.textContent = `CARGO: ${this.score}`;
+          // Make negative scores red
+          if (this.score < 0) {
+            scoreEl.style.color = '#ff4444';
+            scoreEl.style.textShadow = '0 0 6px rgba(255,68,68,0.8)';
+          } else {
+            scoreEl.style.color = 'rgba(0,255,255,0.85)';
+            scoreEl.style.textShadow = '0 0 8px rgba(0,255,255,0.6)';
+          }
+        }
+        
+        if (shieldEl) {
+          // Create shield bar visualization - proper logic
+          let shieldBar = '[';
+          const segments = 4;
+          const segmentsToShow = Math.max(0, Math.ceil(this.shield / 25)); // Each segment = 25%
+          
+          for (let i = 0; i < segments; i++) {
+            if (i < segmentsToShow) {
+              shieldBar += '|';
+            } else {
+              shieldBar += '□';
+            }
+          }
+          shieldBar += ']';
+          
+          shieldEl.textContent = shieldBar;
+          
+          // Handle critical shield blinking
+          if (this.shield <= 10) {
+            shieldEl.classList.add('critical');
+          } else {
+            shieldEl.classList.remove('critical');
+          }
+          
+          // Color based on shield level
+          if (this.shield > 33) {
+            shieldEl.style.color = '#00aaff';
+            shieldEl.style.textShadow = '0 0 6px rgba(0,170,255,0.8)';
+          } else if (this.shield > 10) {
+            shieldEl.style.color = '#ffaa00';
+            shieldEl.style.textShadow = '0 0 6px rgba(255,170,0,0.8)';
+          }
+          // Critical state handled by CSS animation
+        }
+        
+        // Update shield display segments
+        const shieldSegments = document.querySelectorAll('.shield-segment');
+        const segmentsToShow = Math.max(0, Math.ceil(this.shield / 33.33)); // Each segment = 33.33%
+        
+        shieldSegments.forEach((segment, index) => {
+          if (index < segmentsToShow) {
+            segment.classList.remove('damaged');
+            if (this.shield <= 10) {
+              segment.classList.add('critical');
+            } else {
+              segment.classList.remove('critical');
+            }
+          } else {
+            segment.classList.add('damaged');
+            segment.classList.remove('critical');
+          }
+        });
+        
+        if (statusEl) {
+          if (this.shield <= 10) {
+            statusEl.textContent = 'CRIT';
+            statusEl.style.color = '#ff0000';
+            statusEl.style.textShadow = '0 0 6px rgba(255,0,0,0.8)';
+          } else if (this.shield <= 33) {
+            statusEl.textContent = 'DMG';
+            statusEl.style.color = '#ffff00';
+            statusEl.style.textShadow = '0 0 6px rgba(255,255,0,0.8)';
+          } else {
+            statusEl.textContent = 'OK';
+            statusEl.style.color = '#00ff00';
+            statusEl.style.textShadow = '0 0 6px rgba(0,255,0,0.8)';
+          }
+        }
+      }
+      
+      showWarning(message, type = 'default') {
+        const warningOverlay = document.getElementById('warningOverlay');
+        const warningContent = document.getElementById('warningContent');
+        const warningTitle = document.getElementById('warningTitle');
+        const warningSubtext = document.getElementById('warningSubtext');
+        
+        if (warningOverlay && warningContent && warningTitle && warningSubtext) {
+          // Clear existing classes
+          warningContent.className = '';
+          
+          let duration = 1500; // Default brief duration
+          
+          if (type === 'hull-breach') {
+            warningContent.classList.add('hull-breach');
+            warningTitle.textContent = 'HULL BREACH IMMINENT';
+            warningSubtext.textContent = 'CRITICAL SYSTEM FAILURE';
+            duration = 2000; // Slightly longer for critical warnings
+          } else if (type === 'civilian-destroyed') {
+            warningContent.classList.add('civilian-destroyed');
+            warningTitle.textContent = 'CIVILIAN CRAFT DESTROYED';
+            warningSubtext.textContent = 'CARGO PENALTY: -100';
+            duration = 2000;
+          } else if (type === 'planet-mined') {
+            warningContent.classList.add('planet-mined');
+            warningTitle.textContent = 'RARE PLANET MINED';
+            warningSubtext.textContent = 'CARGO BONUS: +50';
+            duration = 900; // Brief positive feedback
+          } else if (type === 'laser-tutorial') {
+            warningContent.classList.add('laser-tutorial');
+            warningTitle.textContent = 'LASER BEAM ACTIVE';
+            warningSubtext.textContent = 'TAP AND HOLD TO FIRE LASER';
+            duration = 900;
+          } else if (type === 'black-hole') {
+            warningContent.classList.add('black-hole');
+            warningTitle.textContent = 'BLACK HOLE DETECTED';
+            warningSubtext.textContent = 'GRAVITATIONAL ANOMALY APPROACHING';
+            duration = 900;
+          }
+          
+          warningOverlay.style.display = 'flex';
+          warningContent.classList.add('show');
+          
+          // Auto-hide after duration
+          setTimeout(() => {
+            warningContent.classList.remove('show');
+            setTimeout(() => {
+              warningOverlay.style.display = 'none';
+            }, 400);
+          }, duration);
+        }
+      }
+      
+      showScoreFlash(amount) {
+        this.scoreFlash = amount > 0 ? `+${amount}` : `${amount}`;
+        this.scoreFlashTimer = 250; // Shorter duration - 1.5 seconds
+      }
+      
+      updateTimers() {
+        if (this.scoreFlashTimer > 0) {
+          this.scoreFlashTimer -= 16;
+          if (this.scoreFlashTimer <= 0) {
+            this.scoreFlash = '';
+          }
+        }
+        
+        // Update power-up timers
+        let powerUpChanged = false;
+        Object.keys(this.activePowerUps).forEach(type => {
+          const oldTime = Math.ceil(this.activePowerUps[type] / 1000);
+          this.activePowerUps[type] -= 16;
+          const newTime = Math.ceil(this.activePowerUps[type] / 1000);
+          
+          if (oldTime !== newTime) {
+            powerUpChanged = true;
+          }
+          
+          if (this.activePowerUps[type] <= 0) {
+            this.removePowerUp(type);
+            powerUpChanged = true;
+          }
+        });
+        
+        // Update UI only when timer values change
+        if (powerUpChanged) {
+          this.updatePowerUpUI();
+        }
+      }
+      
+      activatePowerUp(type) {
+        const powerUp = PowerUpTypes[type];
+        if (!powerUp) return;
+        
+        if (powerUp.effect === 'repair') {
+          this.shield = Math.min(100, this.shield + 50);
+          this.updateUI();
+        } else if (powerUp.duration) {
+          this.activePowerUps[type] = powerUp.duration;
+          if (powerUp.effect === 'multiplier') {
+            this.scoreMultiplier = 2;
+          } else if (powerUp.effect === 'rapid' && !this.laserTutorialShown) {
+            // Show laser tutorial only once per game
+            this.showWarning('', 'laser-tutorial');
+            this.laserTutorialShown = true;
+          }
+        }
+        
+        this.updatePowerUpUI();
+      }
+      
+      removePowerUp(type) {
+        delete this.activePowerUps[type];
+        const powerUp = PowerUpTypes[type];
+        if (powerUp.effect === 'multiplier') {
+          this.scoreMultiplier = 1;
+        } else if (powerUp.effect === 'rapid') {
+          this.laserBeam.active = false;
+          audioEngine.stopLaserSound();
+        }
+        this.updatePowerUpUI();
+      }
+      
+      updatePowerUpUI() {
+        const powerUpDisplay = document.getElementById('powerUpDisplay');
+        if (!powerUpDisplay) return;
+        
+        powerUpDisplay.innerHTML = '';
+        Object.keys(this.activePowerUps).forEach(type => {
+          const powerUp = PowerUpTypes[type];
+          const timeLeft = Math.ceil(this.activePowerUps[type] / 1000);
+          const indicator = document.createElement('div');
+          indicator.className = 'power-up-indicator';
+          
+          // Add critical class if time <= 3 seconds
+          if (timeLeft <= 3) {
+            indicator.classList.add('critical');
+          }
+          
+          // Format time display
+          const minutes = Math.floor(timeLeft / 60);
+          const seconds = timeLeft % 60;
+          const timeDisplay = minutes > 0 ? `${minutes}:${seconds.toString().padStart(2, '0')}` : `${seconds}`;
+          
+          indicator.innerHTML = `
+            <span class="power-up-icon">${powerUp.icon}</span>
+            <span class="power-up-time">${timeDisplay}</span>
+          `;
+          indicator.style.borderColor = powerUp.color;
+          powerUpDisplay.appendChild(indicator);
+        });
+      }
+      
+      hasPowerUp(type) {
+        return this.activePowerUps.hasOwnProperty(type);
+      }
+      
+      addScore(amount = 1) {
+        const actualAmount = amount * this.scoreMultiplier;
+        this.score += actualAmount;
+        if (this.scoreMultiplier > 1) {
+          this.showScoreFlash(`+${actualAmount} (x${this.scoreMultiplier})`);
+        }
+        this.updateUI();
+      }
+      
+      damageShield() {
+        if (!this.gameActive) return false;
+        
+        this.shield -= 33;
+        if (this.shield < 0) this.shield = 0;
+        this.updateUI();
+        
+        if (this.shield <= 0) {
+          this.gameActive = false;
+          this.hullWarningShown = false; // Reset for next game
+          this.lastWarningTime = 0;
+          return true; // Game over
+        }
+        return false; // Continue playing
+      }
+    }
+    
+    // === AUDIO ENGINE ===
+    class AudioEngine {
+      constructor() {
+        this.context = null;
+        this.schedulers = [];
+        this.voices = Array(3).fill().map(() => ({
+          countdown: 0, degreeIndex: null, until: 0, previous: null
+        }));
+        
+        // Musical settings
+        this.bpm = 60;
+        this.rhythm = '4/4';
+        this.currentKey = 'E';
+        this.keyNames = ['C','G','D','A','E','B','F#','Db','Ab','Eb','Bb','F'];
+        this.keyBaseFreqs = {
+          'C': 65.41, 'G': 98.00, 'D': 73.42, 'A': 110.00, 'E': 82.41,
+          'B': 123.47, 'F#': 92.50, 'Db': 69.30, 'Ab': 103.83, 'Eb': 77.78,
+          'Bb': 116.54, 'F': 87.31
+        };
+        this.currentBaseFreq = this.keyBaseFreqs[this.currentKey];
+        this.rhythmOptions = ['4/4', '3/4', '6/8'];
+        this.degreeNames = ['I','ii','iii','IV','V','vi','vii'];
+        this.semitoneDegrees = [0,2,4,5,7,9,11];
+        this.noteLengths = [
+          { name:'whole', beats:4, isRest:false }, { name:'half', beats:2, isRest:false },
+          { name:'quarter', beats:1, isRest:false }, { name:'eighth', beats:0.5, isRest:false },
+          { name:'triplet', beats:1/3, isRest:false },
+          { name:'whole rest', beats:4, isRest:true }, { name:'half rest', beats:2, isRest:true },
+          { name:'quarter rest', beats:1, isRest:true }, { name:'eighth rest', beats:0.5, isRest:true }
+        ];
+        this.beatInterval = 60000 / this.bpm;
+      }
+      
+      async initialize() {
+        try {
+          this.context = new (window.AudioContext || window.webkitAudioContext)();
+          await this.context.resume();
+          return true;
+        } catch (error) {
+          console.error('Audio initialization failed:', error);
+          return false;
+        }
+      }
+      
+      getFrequency(semitones) {
+        return this.currentBaseFreq * Math.pow(2, semitones / 12);
+      }
+      
+      getExclusions(voices) {
+        const exclusions = new Set();
+        voices.forEach(v => {
+          if (v.degreeIndex !== null && v.until > this.context.currentTime) {
+            exclusions.add(v.degreeIndex);
+            exclusions.add((v.degreeIndex + 1) % 7);
+            exclusions.add((v.degreeIndex + 6) % 7);
+          }
+        });
+        return [...exclusions];
+      }
+      
+      getNoteWithDegree(exclude = []) {
+        const valid = this.semitoneDegrees.map((_, i) => i).filter(i => !exclude.includes(i));
+        const idx = valid[Math.floor(Math.random() * valid.length)];
+        const oct = Math.floor(Math.random() * 4);
+        const deg = this.semitoneDegrees[idx];
+        return { 
+          freq: this.getFrequency(oct * 12 + deg), 
+          degreeName: this.degreeNames[idx], 
+          degreeIndex: idx 
+        };
+      }
+      
+      playExpressiveNote(prev, next, durMs) {
+        if (!this.context) return;
+        
+        const style = ['normal', 'trill', 'vibrato', 'slide'][Math.floor(Math.random() * 4)];
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+
+
+        if (style === 'slide' && prev) {
+          osc.frequency.setValueAtTime(prev.freq, this.context.currentTime);
+          osc.frequency.linearRampToValueAtTime(next.freq, this.context.currentTime + durMs/1000);
+        } else if (style === 'vibrato') {
+          const v = this.context.createOscillator();
+          v.frequency.setValueAtTime(6, this.context.currentTime);
+          const vg = this.context.createGain();
+          vg.gain.setValueAtTime(10, this.context.currentTime);
+          v.connect(vg).connect(osc.frequency);
+          v.start(); v.stop(this.context.currentTime + durMs/1000);
+          osc.frequency.setValueAtTime(next.freq, this.context.currentTime);
+        } else if (style === 'trill') {
+          const alt = this.getNoteWithDegree([]);
+          let t = this.context.currentTime;
+          let toggle = true;
+          while (t < this.context.currentTime + durMs/1000) {
+            osc.frequency.setValueAtTime(toggle ? next.freq : alt.freq, t);
+            t += 0.1; toggle = !toggle;
+          }
+        } else {
+          osc.frequency.setValueAtTime(next.freq, this.context.currentTime);
+        }
+
+
+        gain.gain.setValueAtTime(0, this.context.currentTime);
+        gain.gain.linearRampToValueAtTime(0.1, this.context.currentTime + 0.05);
+        gain.gain.linearRampToValueAtTime(0, this.context.currentTime + durMs / 1000);
+        osc.connect(gain); gain.connect(this.context.destination);
+        osc.start(); osc.stop(this.context.currentTime + durMs / 1000);
+      }
+      
+      playLaserSound() {
+        if (!this.context) return;
+        
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, this.context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, this.context.currentTime + 0.15);
+        
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1000, this.context.currentTime);
+        
+        gain.gain.setValueAtTime(0.3, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.15);
+        
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.context.destination);
+        
+        osc.start();
+        osc.stop(this.context.currentTime + 0.15);
+      }
+      
+      playExplosionSound() {
+        if (!this.context) return;
+        
+        const bufferSize = this.context.sampleRate * 0.5;
+        const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+        }
+        
+        const source = this.context.createBufferSource();
+        const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
+        
+        source.buffer = buffer;
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(200, this.context.currentTime);
+        
+        gain.gain.setValueAtTime(0.4, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.5);
+        
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.context.destination);
+        
+        source.start();
+        
+        // Add rumble
+        const rumble = this.context.createOscillator();
+        const rumbleGain = this.context.createGain();
+        rumble.type = 'sine';
+        rumble.frequency.setValueAtTime(60, this.context.currentTime);
+        rumbleGain.gain.setValueAtTime(0.2, this.context.currentTime);
+        rumbleGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.3);
+        
+        rumble.connect(rumbleGain);
+        rumbleGain.connect(this.context.destination);
+        rumble.start();
+        rumble.stop(this.context.currentTime + 0.3);
+      }
+      
+      playShieldDamageSound() {
+        if (!this.context) return;
+        
+        const bufferSize = this.context.sampleRate * 0.8;
+        const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+        }
+        
+        const source = this.context.createBufferSource();
+        const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
+        
+        source.buffer = buffer;
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(150, this.context.currentTime);
+        
+        gain.gain.setValueAtTime(0.6, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.8);
+        
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.context.destination);
+        
+        source.start();
+        
+        // Bass thump
+        const thump = this.context.createOscillator();
+        const thumpGain = this.context.createGain();
+        thump.type = 'sine';
+        thump.frequency.setValueAtTime(40, this.context.currentTime);
+        thump.frequency.exponentialRampToValueAtTime(20, this.context.currentTime + 0.3);
+        thumpGain.gain.setValueAtTime(0.4, this.context.currentTime);
+        thumpGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.5);
+        
+        thump.connect(thumpGain);
+        thumpGain.connect(this.context.destination);
+        thump.start();
+        thump.stop(this.context.currentTime + 0.5);
+      }
+      
+      playGameOverSound() {
+        if (!this.context) return;
+        
+        const bufferSize = this.context.sampleRate * 1.5;
+        const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 0.8);
+        }
+        
+        const source = this.context.createBufferSource();
+        const gain = this.context.createGain();
+        
+        source.buffer = buffer;
+        gain.gain.setValueAtTime(0.8, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 1.5);
+        
+        source.connect(gain);
+        gain.connect(this.context.destination);
+        
+        source.start();
+        
+        // Dramatic sweep
+        const sweep = this.context.createOscillator();
+        const sweepGain = this.context.createGain();
+        sweep.type = 'sawtooth';
+        sweep.frequency.setValueAtTime(200, this.context.currentTime);
+        sweep.frequency.exponentialRampToValueAtTime(20, this.context.currentTime + 1.2);
+        sweepGain.gain.setValueAtTime(0.5, this.context.currentTime);
+        sweepGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 1.2);
+        
+        sweep.connect(sweepGain);
+        sweepGain.connect(this.context.destination);
+        sweep.start();
+        sweep.stop(this.context.currentTime + 1.2);
+      }
+      
+      playPowerUpSound() {
+        if (!this.context) return;
+        
+        const osc1 = this.context.createOscillator();
+        const osc2 = this.context.createOscillator();
+        const gain = this.context.createGain();
+        
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(220, this.context.currentTime);
+        osc1.frequency.exponentialRampToValueAtTime(440, this.context.currentTime + 0.3);
+        osc2.frequency.setValueAtTime(330, this.context.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(660, this.context.currentTime + 0.3);
+        
+        gain.gain.setValueAtTime(0.3, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.3);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.context.destination);
+        
+        osc1.start();
+        osc2.start();
+        osc1.stop(this.context.currentTime + 0.3);
+        osc2.stop(this.context.currentTime + 0.3);
+      }
+      
+      startLaserSound() {
+        if (!this.context || gameState.laserSound) return;
+        
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, this.context.currentTime);
+        
+        // Add frequency modulation for laser effect
+        const lfo = this.context.createOscillator();
+        const lfoGain = this.context.createGain();
+        lfo.frequency.setValueAtTime(5, this.context.currentTime);
+        lfoGain.gain.setValueAtTime(20, this.context.currentTime);
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+        
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, this.context.currentTime);
+        filter.Q.setValueAtTime(2, this.context.currentTime);
+        
+        gain.gain.setValueAtTime(0.2, this.context.currentTime);
+        
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.context.destination);
+        
+        osc.start();
+        lfo.start();
+        
+        gameState.laserSound = { osc, gain, filter, lfo, lfoGain };
+      }
+      
+      stopLaserSound() {
+        if (!gameState.laserSound) return;
+        
+        const { osc, gain, lfo } = gameState.laserSound;
+        gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.1);
+        osc.stop(this.context.currentTime + 0.1);
+        lfo.stop(this.context.currentTime + 0.1);
+        
+        gameState.laserSound = null;
+      }
+      
+      playBlackHoleSound() {
+        if (!this.context || gameState.blackHoleSound) return;
+        
+        // Deep rumbling sound
+        const rumble = this.context.createOscillator();
+        const rumbleGain = this.context.createGain();
+        rumble.type = 'sine';
+        rumble.frequency.setValueAtTime(30, this.context.currentTime);
+        rumbleGain.gain.setValueAtTime(0.9, this.context.currentTime);
+        
+        // Whooshing sound
+        const whoosh = this.context.createOscillator();
+        const whooshGain = this.context.createGain();
+        const whooshFilter = this.context.createBiquadFilter();
+        whoosh.type = 'sawtooth';
+        whoosh.frequency.setValueAtTime(80, this.context.currentTime);
+        whooshFilter.type = 'lowpass';
+        whooshFilter.frequency.setValueAtTime(200, this.context.currentTime);
+        whooshGain.gain.setValueAtTime(0.2, this.context.currentTime);
+        
+        rumble.connect(rumbleGain);
+        whoosh.connect(whooshFilter);
+        whooshFilter.connect(whooshGain);
+        rumbleGain.connect(this.context.destination);
+        whooshGain.connect(this.context.destination);
+        
+        rumble.start();
+        whoosh.start();
+        
+        gameState.blackHoleSound = { rumble, rumbleGain, whoosh, whooshGain, whooshFilter };
+      }
+      
+      stopBlackHoleSound() {
+        if (!gameState.blackHoleSound) return;
+        
+        const { rumble, rumbleGain, whoosh, whooshGain } = gameState.blackHoleSound;
+        rumbleGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.5);
+        whooshGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.5);
+        rumble.stop(this.context.currentTime + 0.5);
+        whoosh.stop(this.context.currentTime + 0.5);
+        
+        gameState.blackHoleSound = null;
+      }
+      
+      randomizeSettings() {
+        this.currentKey = this.keyNames[Math.floor(Math.random() * this.keyNames.length)];
+        this.currentBaseFreq = this.keyBaseFreqs[this.currentKey];
+        this.bpm = Math.floor(Math.random() * 31) + 60;
+        this.rhythm = this.rhythmOptions[Math.floor(Math.random() * this.rhythmOptions.length)];
+        this.beatInterval = 60000 / this.bpm;
+        // No UI updates needed - HUD doesn't show these anymore
+      }
+      
+      startScheduler() {
+        this.stopScheduler(); // Clean stop first
+        
+        for (let i = 0; i < this.voices.length; i++) {
+          this.schedulers[i] = setInterval(() => {
+            const v = this.voices[i];
+            if (v.countdown <= 0) {
+              const len = this.noteLengths[Math.floor(Math.random() * this.noteLengths.length)];
+              v.countdown = len.beats;
+              if (!len.isRest) {
+                const note = this.getNoteWithDegree(this.getExclusions(this.voices.filter((_,j) => j !== i)));
+                this.playExpressiveNote(v.previous, note, this.beatInterval * len.beats);
+                v.previous = note;
+                v.degreeIndex = note.degreeIndex;
+                v.until = this.context.currentTime + (this.beatInterval * len.beats) / 1000;
+              } else {
+                v.degreeIndex = null;
+                v.until = 0;
+              }
+            }
+            if (i === 0) {
+              gameState.currentBeat++;
+              const bar = Math.floor(gameState.currentBeat / 4) % 12 + 1;
+              if (bar === 12 && gameState.currentBeat % 4 === 3) {
+                this.randomizeSettings();
+              }
+            }
+            v.countdown -= 0.5;
+          }, this.beatInterval / 2);
+        }
+      }
+      
+      stopScheduler() {
+        this.schedulers.forEach(scheduler => clearInterval(scheduler));
+        this.schedulers = [];
+      }
+      
+      cleanup() {
+        this.stopScheduler();
+        // Don't close context - we'll reuse it
+      }
+    }
+    
+    // === GRAPHICS ENGINE ===
+    class Vector3 {
+      constructor(x=0, y=0, z=0) {
+        this.x = x; this.y = y; this.z = z;
+      }
+      add(v) { return new Vector3(this.x + v.x, this.y + v.y, this.z + v.z); }
+      subtract(v) { return new Vector3(this.x - v.x, this.y - v.y, this.z - v.z); }
+      multiply(s) { return new Vector3(this.x * s, this.y * s, this.z * s); }
+      length() { return Math.sqrt(this.x**2 + this.y**2 + this.z**2); }
+    }
+    
+    class Particle {
+      constructor(x, y, z) {
+        this.position = new Vector3(x, y, z);
+        this.velocity = new Vector3(
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 20
+        );
+        this.life = 1.0;
+        this.decay = 0.02 + Math.random() * 0.02;
+        this.size = 1 + Math.random() * 3;
+        this.color = Math.random() < 0.5 ? 
+          `rgba(255,${100 + Math.floor(Math.random() * 155)},0,` : 
+          `rgba(0,${100 + Math.floor(Math.random() * 155)},255,`;
+      }
+      
+      update() {
+        this.position = this.position.add(this.velocity);
+        this.velocity = this.velocity.multiply(0.98);
+        this.life -= this.decay;
+        return this.life > 0;
+      }
+      
+      render(ctx, camera) {
+        const proj = project3D(this.position.subtract(camera.position));
+        if (proj) {
+          ctx.fillStyle = this.color + this.life + ')';
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, this.size * this.life, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    
+    // === MAIN GAME ===
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const gameState = new GameState();
+    const audioEngine = new AudioEngine();
+    
+    // Game objects
+    const camera = { position: new Vector3(0, 0, 0), fov: 70, near: 0.1, far: 1000 };
+    const projection = { width: 0, height: 0, centerX: 0, centerY: 0, scale: 0 };
+    const stars = [], galaxies = [], nebulae = [], planets = [], asteroids = [], particles = [];
+    const minablePlanets = [], ufos = [], powerUps = [];
+    
+    // Helper functions
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      projection.width = canvas.width;
+      projection.height = canvas.height;
+      projection.centerX = canvas.width / 2;
+      projection.centerY = canvas.height / 2;
+      projection.scale = Math.min(canvas.width, canvas.height) * 0.4;
+    }
+    
+    function rotateX(p, a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return new Vector3(p.x, p.y * c - p.z * s, p.y * s + p.z * c);
+    }
+    
+    function rotateY(p, a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return new Vector3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+    }
+    
+    function rotateZ(p, a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      return new Vector3(p.x * c - p.y * s, p.x * s + p.y * c, p.z);
+    }
+    
+    function project3D(p) {
+      if (p.z <= camera.near) return null;
+      const s = projection.scale / p.z;
+      return { x: projection.centerX + p.x * s, y: projection.centerY - p.y * s, z: p.z };
+    }
+    
+    function generateAsteroidVertices(count = 8) {
+      const vertices = [];
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2;
+        const phi = Math.acos(1 - 2 * Math.random());
+        const r = 0.8 + Math.random() * 0.4;
+        vertices.push(new Vector3(
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.sin(phi) * Math.sin(theta),
+          r * Math.cos(phi)
+        ));
+      }
+      return vertices;
+    }
+    
+    function spawnAsteroid() {
+      asteroids.push({
+        position: new Vector3(
+          (Math.random() - 0.5) * 600,
+          (Math.random() - 0.5) * 600,
+          camera.position.z + 600 + Math.random() * 400
+        ),
+        rotation: new Vector3(
+          (Math.random() - 0.5) * 0.008,
+          (Math.random() - 0.5) * 0.008,
+          (Math.random() - 0.5) * 0.008
+        ),
+        currentRotation: new Vector3(0, 0, 0),
+        scale: Math.random() * 35 + 25,
+        vertices: generateAsteroidVertices(4 + Math.floor(Math.random() * 4)),
+        isHovered: false
+      });
+    }
+    
+    function spawnMinablePlanet() {
+      minablePlanets.push({
+        position: new Vector3(
+          (Math.random() - 0.5) * 600,
+          (Math.random() - 0.5) * 600,
+          camera.position.z + 600 + Math.random() * 400
+        ),
+        size: Math.random() * 25 + 20,
+        color: `hsl(${Math.random() * 60 + 120}, 80%, 60%)`, // Green-ish colors
+        pulsePhase: Math.random() * Math.PI * 2,
+        rings: Math.random() > 0.7,
+        isHovered: false
+      });
+    }
+    
+    function spawnUFO() {
+      const side = Math.random() > 0.5 ? 1 : -1;
+      ufos.push({
+        position: new Vector3(
+          side * 400, // Even closer spawn distance
+          (Math.random() - 0.5) * 200, // Tighter vertical range
+          camera.position.z + 100 + Math.random() * 300 // Much closer to player
+        ),
+        velocity: new Vector3(
+          -side * (1.0 + Math.random() * 1.5), // Faster movement
+          (Math.random() - 0.5) * 0.15, // Less vertical drift
+          -0.02 // Minimal forward movement
+        ),
+        size: 12 + Math.random() * 6,
+        lightPhase: Math.random() * Math.PI * 2,
+        isHovered: false
+      });
+    }
+    
+    function spawnBlackHole() {
+      if (gameState.blackHole.active) return;
+      
+      const currentTime = Date.now();
+      // Only spawn if it's been at least 1 minute since last black hole
+      if (currentTime - gameState.blackHole.lastSpawn < 1000) return;
+      
+      gameState.blackHole.active = true;
+      gameState.blackHole.x = 0; // Center X
+      gameState.blackHole.y = 0; // Center Y
+      gameState.blackHole.z = camera.position.z + 200; // Closer to player
+      gameState.blackHole.phase = 0;
+      gameState.blackHole.duration = 6000; // 6 seconds
+      gameState.blackHole.lastSpawn = currentTime;
+      
+      // Show warning message
+      gameState.showWarning('', 'black-hole');
+      
+      // Start black hole sound
+      audioEngine.playBlackHoleSound();
+    }
+    
+    function spawnPowerUp() {
+      const types = Object.keys(PowerUpTypes);
+      const type = types[Math.floor(Math.random() * types.length)];
+      
+      powerUps.push({
+        type: type,
+        position: new Vector3(
+          (Math.random() - 0.5) * 400,
+          (Math.random() - 0.5) * 400,
+          camera.position.z + 400 + Math.random() * 200
+        ),
+        rotationPhase: Math.random() * Math.PI * 2,
+        pulsePhase: Math.random() * Math.PI * 2,
+        isHovered: false
+      });
+    }
+    
+    function spawnBlackHole() {
+      if (gameState.blackHole.active) return;
+      
+      const currentTime = Date.now();
+      // Only spawn if it's been at least 2 minutes since last black hole
+      if (currentTime - gameState.blackHole.lastSpawn < 0) return;
+      
+      gameState.blackHole.active = true;
+      gameState.blackHole.x = (Math.random() - 0.5) * 400;
+      gameState.blackHole.y = (Math.random() - 0.5) * 300;
+      gameState.blackHole.z = camera.position.z + 300;
+      gameState.blackHole.phase = 0;
+      gameState.blackHole.duration = 6000; // 6 seconds
+      gameState.blackHole.lastSpawn = currentTime;
+      
+      // Show warning message
+      gameState.showWarning('', 'black-hole');
+      
+      // Start black hole sound
+      audioEngine.playBlackHoleSound();
+    }
+    
+    function updateBlackHole() {
+      if (!gameState.blackHole.active) return;
+      
+      gameState.blackHole.phase += 0.05;
+      gameState.blackHole.duration -= 16;
+      
+      if (gameState.blackHole.duration <= 0) {
+        // Black hole disappears
+        gameState.blackHole.active = false;
+        audioEngine.stopBlackHoleSound();
+        
+        // Respawn some asteroids after black hole disappears
+        setTimeout(() => {
+          for (let i = 0; i < 6; i++) {
+            spawnAsteroid();
+          }
+        }, 1000);
+        return;
+      }
+      
+      // Suck in objects - much stronger force
+      const blackHolePos = new Vector3(gameState.blackHole.x, gameState.blackHole.y, gameState.blackHole.z);
+      
+      // Suck in asteroids
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const ast = asteroids[i];
+        const direction = blackHolePos.subtract(ast.position);
+        const distance = direction.length();
+        
+        if (distance < 800) { // Increased range
+          // Much stronger gravitational pull
+          const pullStrength = Math.max(2.0, 600 / distance);
+          const pullDirection = direction.multiply(1 / distance);
+          ast.position = ast.position.add(pullDirection.multiply(pullStrength));
+          
+          // Remove if too close
+          if (distance < 50) {
+            asteroids.splice(i, 1);
+            // Create absorption particles
+            for (let j = 0; j < 15; j++) {
+              particles.push(new Particle(ast.position.x, ast.position.y, ast.position.z));
+            }
+          }
+        }
+      }
+      
+      // Suck in UFOs
+      for (let i = ufos.length - 1; i >= 0; i--) {
+        const ufo = ufos[i];
+        const direction = blackHolePos.subtract(ufo.position);
+        const distance = direction.length();
+        
+        if (distance < 800) {
+          const pullStrength = Math.max(2.0, 600 / distance);
+          const pullDirection = direction.multiply(1 / distance);
+          ufo.position = ufo.position.add(pullDirection.multiply(pullStrength));
+          
+          if (distance < 50) {
+            ufos.splice(i, 1);
+            for (let j = 0; j < 15; j++) {
+              particles.push(new Particle(ufo.position.x, ufo.position.y, ufo.position.z));
+            }
+          }
+        }
+      }
+      
+      // Suck in power-ups
+      for (let i = powerUps.length - 1; i >= 0; i--) {
+        const powerUp = powerUps[i];
+        const direction = blackHolePos.subtract(powerUp.position);
+        const distance = direction.length();
+        
+        if (distance < 800) {
+          const pullStrength = Math.max(2.0, 600 / distance);
+          const pullDirection = direction.multiply(1 / distance);
+          powerUp.position = powerUp.position.add(pullDirection.multiply(pullStrength));
+          
+          if (distance < 50) {
+            powerUps.splice(i, 1);
+            for (let j = 0; j < 15; j++) {
+              particles.push(new Particle(powerUp.position.x, powerUp.position.y, powerUp.position.z));
+            }
+          }
+        }
+      }
+      
+      // Suck in minable planets too for more drama
+      for (let i = minablePlanets.length - 1; i >= 0; i--) {
+        const planet = minablePlanets[i];
+        const direction = blackHolePos.subtract(planet.position);
+        const distance = direction.length();
+        
+        if (distance < 800) {
+          const pullStrength = Math.max(1.5, 500 / distance);
+          const pullDirection = direction.multiply(1 / distance);
+          planet.position = planet.position.add(pullDirection.multiply(pullStrength));
+          
+          if (distance < 50) {
+            minablePlanets.splice(i, 1);
+            for (let j = 0; j < 20; j++) {
+              particles.push(new Particle(planet.position.x, planet.position.y, planet.position.z));
+            }
+          }
+        }
+      }
+    }
+    
+    function initializeBackground() {
+      // Stars
+      for (let i = 0; i < 400; i++) {
+        stars.push({
+          x: (Math.random() - 0.5) * 3000,
+          y: (Math.random() - 0.5) * 3000,
+          z: Math.random() * 1500 + 500,
+          brightness: Math.random(),
+          color: Math.random() < 0.3 ? 
+            `hsl(${Math.random() * 60 + 200}, 80%, 70%)` : 
+            `hsl(${Math.random() * 30}, 60%, 85%)`
+        });
+      }
+      
+      // Galaxies
+      for (let i = 0; i < 8; i++) {
+        galaxies.push({
+          x: (Math.random() - 0.5) * 2000,
+          y: (Math.random() - 0.5) * 2000,
+          z: Math.random() * 1200 + 800,
+          rotation: Math.random() * Math.PI * 2,
+          rotationSpeed: (Math.random() - 0.5) * 0.008,
+          size: Math.random() * 80 + 40,
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`
+        });
+      }
+      
+      // Nebulae
+      for (let i = 0; i < 12; i++) {
+        nebulae.push({
+          x: (Math.random() - 0.5) * 1800,
+          y: (Math.random() - 0.5) * 1800,
+          z: Math.random() * 1000 + 700,
+          size: Math.random() * 120 + 60,
+          color: `hsl(${Math.random() * 360}, 60%, 40%)`,
+          opacity: 0.1 + Math.random() * 0.2
+        });
+      }
+      
+      // Planets
+      for (let i = 0; i < 6; i++) {
+        planets.push({
+          x: (Math.random() - 0.5) * 1200,
+          y: (Math.random() - 0.5) * 1200,
+          z: Math.random() * 800 + 400,
+          size: Math.random() * 30 + 15,
+          color: `hsl(${Math.random() * 360}, 70%, 55%)`,
+          rings: Math.random() > 0.5
+        });
+      }
+    }
+    
+    function updateLaserBeam(x, y) {
+      if (gameState.hasPowerUp('RAPID_FIRE')) {
+        if (!gameState.laserBeam.active) {
+          audioEngine.startLaserSound();
+        }
+        gameState.laserBeam.active = true;
+        gameState.laserBeam.x = x;
+        gameState.laserBeam.y = y;
+        
+        // Auto-fire every 100ms
+        const currentTime = Date.now();
+        if (currentTime - gameState.laserBeam.lastFire > 100) {
+          checkObjectClick(x, y);
+          gameState.laserBeam.lastFire = currentTime;
+        }
+      }
+    }
+    
+    function checkObjectClick(x, y) {
+      if (!gameState.gameActive) return false;
+      
+      // Check Power-ups first (highest priority)
+      for (let i = powerUps.length - 1; i >= 0; i--) {
+        const powerUp = powerUps[i];
+        const worldPos = powerUp.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = 25;
+          
+          if (distance < screenSize) {
+            // Create sparkle particles
+            for (let j = 0; j < 20; j++) {
+              const particle = new Particle(powerUp.position.x, powerUp.position.y, powerUp.position.z);
+              particle.color = PowerUpTypes[powerUp.type].color.replace('#', 'rgba(').replace(/([0-9a-f]{2})/gi, (match, p1) => parseInt(p1, 16) + ',').slice(0, -1) + ',';
+              particles.push(particle);
+            }
+            
+            // Play power-up sound
+            audioEngine.playPowerUpSound();
+            
+            // Activate power-up
+            gameState.activatePowerUp(powerUp.type);
+            
+            // Remove power-up
+            powerUps.splice(i, 1);
+            return true;
+          }
+        }
+      }
+      
+      // Handle piercing shot
+      if (gameState.hasPowerUp('PIERCING_SHOT')) {
+        return handlePiercingShot(x, y);
+      }
+      
+      // Check UFOs first (penalty for destroying them)
+      for (let i = ufos.length - 1; i >= 0; i--) {
+        const ufo = ufos[i];
+        const worldPos = ufo.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(20, (ufo.size * 25) / proj.z);
+          
+          if (distance < screenSize) {
+            // Create explosion particles
+            for (let j = 0; j < 30; j++) {
+              particles.push(new Particle(ufo.position.x, ufo.position.y, ufo.position.z));
+            }
+            
+            // Play sounds
+            audioEngine.playLaserSound();
+            setTimeout(() => audioEngine.playExplosionSound(), 100);
+            
+            // Remove UFO and LOSE 100 cargo
+            ufos.splice(i, 1);
+            gameState.score -= 100;
+            gameState.showWarning('', 'civilian-destroyed');
+            gameState.showScoreFlash(-100);
+            gameState.updateUI();
+            return true;
+          }
+        }
+      }
+      
+      // Check minable planets (bonus points)
+      for (let i = minablePlanets.length - 1; i >= 0; i--) {
+        const planet = minablePlanets[i];
+        const worldPos = planet.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(25, (planet.size * 20) / proj.z);
+          
+          if (distance < screenSize) {
+            // Create explosion particles
+            for (let j = 0; j < 50; j++) {
+              particles.push(new Particle(planet.position.x, planet.position.y, planet.position.z));
+            }
+            
+            // Play sounds
+            audioEngine.playLaserSound();
+            setTimeout(() => audioEngine.playExplosionSound(), 100);
+            
+            // Remove planet and add 50 cargo
+            minablePlanets.splice(i, 1);
+            gameState.score += 50 * gameState.scoreMultiplier;
+            gameState.showWarning('', 'planet-mined');
+            gameState.showScoreFlash(50 * gameState.scoreMultiplier);
+            gameState.updateUI();
+            return true;
+          }
+        }
+      }
+      
+      // Check asteroids (normal points)
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const ast = asteroids[i];
+        const worldPos = ast.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(25, (ast.scale * 15) / proj.z);
+          
+          if (distance < screenSize) {
+            // Create explosion
+            for (let j = 0; j < 50; j++) {
+              particles.push(new Particle(ast.position.x, ast.position.y, ast.position.z));
+            }
+            
+            // Play sounds
+            audioEngine.playLaserSound();
+            setTimeout(() => audioEngine.playExplosionSound(), 100);
+            
+            // Update game state
+            asteroids.splice(i, 1);
+            gameState.addScore(1);
+            spawnAsteroid();
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    
+    function handlePiercingShot(x, y) {
+      let hitSomething = false;
+      const hitObjects = [];
+      
+      // Check all objects and collect hits
+      [...asteroids, ...minablePlanets, ...ufos].forEach(obj => {
+        const worldPos = obj.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          let screenSize;
+          
+          if (asteroids.includes(obj)) {
+            screenSize = Math.max(25, (obj.scale * 15) / proj.z);
+          } else if (minablePlanets.includes(obj)) {
+            screenSize = Math.max(25, (obj.size * 20) / proj.z);
+          } else if (ufos.includes(obj)) {
+            screenSize = Math.max(20, (obj.size * 25) / proj.z);
+          }
+          
+          if (distance < screenSize * 1.5) { // Larger hit area for piercing
+            hitObjects.push(obj);
+          }
+        }
+      });
+      
+      // Process all hits
+      hitObjects.forEach(obj => {
+        // Create explosion particles
+        for (let j = 0; j < 30; j++) {
+          particles.push(new Particle(obj.position.x, obj.position.y, obj.position.z));
+        }
+        
+        if (asteroids.includes(obj)) {
+          const index = asteroids.indexOf(obj);
+          asteroids.splice(index, 1);
+          gameState.addScore(1);
+          spawnAsteroid();
+        } else if (minablePlanets.includes(obj)) {
+          const index = minablePlanets.indexOf(obj);
+          minablePlanets.splice(index, 1);
+          gameState.score += 50 * gameState.scoreMultiplier;
+          gameState.showWarning('', 'planet-mined');
+          gameState.showScoreFlash(50 * gameState.scoreMultiplier);
+          gameState.updateUI();
+        } else if (ufos.includes(obj)) {
+          const index = ufos.indexOf(obj);
+          ufos.splice(index, 1);
+          gameState.score -= 100;
+          gameState.showWarning('', 'civilian-destroyed');
+          gameState.showScoreFlash(-100);
+          gameState.updateUI();
+        }
+        
+        hitSomething = true;
+      });
+      
+      if (hitSomething) {
+        audioEngine.playLaserSound();
+        setTimeout(() => audioEngine.playExplosionSound(), 100);
+      }
+      
+      return hitSomething;
+    }
+    
+    function checkObjectHover(x, y) {
+      if (!gameState.gameActive) return;
+      
+      let foundHover = false;
+      
+      // Check Power-ups
+      powerUps.forEach(powerUp => {
+        const worldPos = powerUp.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = 25;
+          
+          if (distance < screenSize) {
+            powerUp.isHovered = true;
+            foundHover = true;
+          } else {
+            powerUp.isHovered = false;
+          }
+        } else {
+          powerUp.isHovered = false;
+        }
+      });
+      
+      // Check UFOs
+      ufos.forEach(ufo => {
+        const worldPos = ufo.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(20, (ufo.size * 25) / proj.z);
+          
+          if (distance < screenSize) {
+            ufo.isHovered = true;
+            foundHover = true;
+          } else {
+            ufo.isHovered = false;
+          }
+        } else {
+          ufo.isHovered = false;
+        }
+      });
+      
+      // Check minable planets
+      minablePlanets.forEach(planet => {
+        const worldPos = planet.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(25, (planet.size * 20) / proj.z);
+          
+          if (distance < screenSize) {
+            planet.isHovered = true;
+            foundHover = true;
+          } else {
+            planet.isHovered = false;
+          }
+        } else {
+          planet.isHovered = false;
+        }
+      });
+      
+      // Check asteroids
+      asteroids.forEach(ast => {
+        const worldPos = ast.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const distance = Math.sqrt((x - proj.x)**2 + (y - proj.y)**2);
+          const screenSize = Math.max(25, (ast.scale * 15) / proj.z);
+          
+          if (distance < screenSize) {
+            ast.isHovered = true;
+            foundHover = true;
+          } else {
+            ast.isHovered = false;
+          }
+        } else {
+          ast.isHovered = false;
+        }
+      });
+      
+      canvas.style.cursor = foundHover ? 'pointer' : 'crosshair';
+    }
+    
+    function handleShieldDamage() {
+      const isGameOver = gameState.damageShield();
+      
+      if (isGameOver) {
+        // Clear hover states for all objects
+        asteroids.forEach(ast => ast.isHovered = false);
+        minablePlanets.forEach(planet => planet.isHovered = false);
+        ufos.forEach(ufo => ufo.isHovered = false);
+        powerUps.forEach(powerUp => powerUp.isHovered = false);
+        canvas.style.cursor = 'crosshair';
+        
+        // Stop laser sound
+        audioEngine.stopLaserSound();
+        audioEngine.stopBlackHoleSound();
+        gameState.laserBeam.active = false;
+        gameState.blackHole.active = false;
+        
+        // Clear power-up display
+        gameState.activePowerUps = {};
+        gameState.updatePowerUpUI();
+        
+        audioEngine.playGameOverSound();
+        audioEngine.stopScheduler();
+        stopPeriodicSpawning();
+        
+        // Show game over screen with fade effect
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameOverContent = document.getElementById('gameOverContent');
+        const finalScore = document.getElementById('finalScore');
+        
+        if (gameOverScreen && gameOverContent && finalScore) {
+          gameOverScreen.style.display = 'flex';
+          finalScore.textContent = `FINAL CARGO: ${gameState.score}`;
+          
+          // Fade to black first
+          setTimeout(() => {
+            gameOverScreen.classList.add('fade-in');
+          }, 100);
+          
+          // Show content after fade
+          setTimeout(() => {
+            gameOverContent.classList.add('show');
+          }, 2000);
+        }
+      } else {
+        audioEngine.playShieldDamageSound();
+      }
+    }
+    
+    function render() {
+      ctx.fillStyle = '#000008';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const time = Date.now();
+      
+      // Background objects
+      nebulae.forEach(n => {
+        const pos = new Vector3(
+          n.x - camera.position.x * 0.02,
+          n.y - camera.position.y * 0.02,
+          n.z - camera.position.z * 0.02
+        );
+        const p = project3D(pos);
+        if (p) {
+          const scale = 400 / pos.z;
+          const size = n.size * scale;
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
+          grad.addColorStop(0, n.color.replace('40%', '30%'));
+          grad.addColorStop(1, 'transparent');
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = n.opacity;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      });
+      
+      stars.forEach(s => {
+        const pos = new Vector3(
+          s.x - camera.position.x * 0.1,
+          s.y - camera.position.y * 0.1,
+          s.z - camera.position.z * 0.1
+        );
+        const p = project3D(pos);
+        if (p && p.x > 0 && p.x < canvas.width && p.y > 0 && p.y < canvas.height) {
+          ctx.fillStyle = s.color;
+          const twinkle = 0.5 + 0.5 * Math.sin(time * 0.003 + s.z);
+          ctx.globalAlpha = s.brightness * twinkle;
+          ctx.fillRect(p.x, p.y, 2, 2);
+          ctx.globalAlpha = 1;
+        }
+      });
+      
+      galaxies.forEach(g => {
+        g.rotation += g.rotationSpeed;
+        const pos = new Vector3(
+          g.x - camera.position.x * 0.05,
+          g.y - camera.position.y * 0.05,
+          g.z - camera.position.z * 0.05
+        );
+        const p = project3D(pos);
+        if (p) {
+          const scale = 400 / pos.z;
+          const size = g.size * scale;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(g.rotation);
+          ctx.strokeStyle = g.color;
+          ctx.globalAlpha = 0.3;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          for (let arm = 0; arm < 3; arm++) {
+            const offset = arm * Math.PI * 2 / 3;
+            for (let i = 0; i < 50; i++) {
+              const t = i / 50;
+              const angle = offset + t * Math.PI * 4;
+              const radius = t * size;
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+          }
+          ctx.stroke();
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+      });
+      
+      planets.forEach(planet => {
+        const pos = new Vector3(
+          planet.x - camera.position.x * 0.03,
+          planet.y - camera.position.y * 0.03,
+          planet.z - camera.position.z * 0.03
+        );
+        const p = project3D(pos);
+        if (p) {
+          const scale = 300 / pos.z;
+          const size = planet.size * scale;
+          
+          const grad = ctx.createRadialGradient(p.x - size * 0.3, p.y - size * 0.3, 0, p.x, p.y, size);
+          grad.addColorStop(0, planet.color.replace('55%', '75%'));
+          grad.addColorStop(1, planet.color.replace('55%', '25%'));
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          if (planet.rings) {
+            ctx.strokeStyle = planet.color.replace('55%', '40%');
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.6;
+            for (let r = 1.3; r < 2.2; r += 0.2) {
+              ctx.beginPath();
+              ctx.ellipse(p.x, p.y, size * r, size * r * 0.3, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+          }
+        }
+      });
+      
+      // Particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const particle = particles[i];
+        if (!particle.update()) {
+          particles.splice(i, 1);
+        } else {
+          particle.render(ctx, camera);
+        }
+      }
+      
+      // Black hole
+      if (gameState.blackHole.active) {
+        const blackHolePos = new Vector3(gameState.blackHole.x, gameState.blackHole.y, gameState.blackHole.z);
+        const worldPos = blackHolePos.subtract(camera.position);
+        const proj = project3D(worldPos);
+        
+        if (proj) {
+          const scale = projection.scale / worldPos.z;
+          const size = 120 * scale; // Increased size for center positioning
+          const phase = gameState.blackHole.phase;
+          
+          // Event horizon (black center)
+          const eventHorizonGrad = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, size * 0.3);
+          eventHorizonGrad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+          eventHorizonGrad.addColorStop(1, 'rgba(20, 0, 20, 0.8)');
+          ctx.fillStyle = eventHorizonGrad;
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, size * 0.3, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Accretion disk
+          ctx.save();
+          ctx.translate(proj.x, proj.y);
+          ctx.rotate(phase);
+          
+          for (let ring = 0; ring < 3; ring++) {
+            const ringRadius = size * (0.4 + ring * 0.2);
+            const ringWidth = size * 0.1;
+            
+            const diskGrad = ctx.createRadialGradient(0, 0, ringRadius - ringWidth, 0, 0, ringRadius + ringWidth);
+            diskGrad.addColorStop(0, 'rgba(255, 100, 0, 0)');
+            diskGrad.addColorStop(0.3, `rgba(255, ${150 + ring * 50}, ${ring * 100}, 0.6)`);
+            diskGrad.addColorStop(0.7, `rgba(255, ${100 + ring * 30}, ${ring * 50}, 0.4)`);
+            diskGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+            
+            ctx.strokeStyle = diskGrad;
+            ctx.lineWidth = ringWidth;
+            ctx.beginPath();
+            ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          
+          // Swirling particles
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2 + phase * 2;
+            const radius = size * (0.5 + 0.3 * Math.sin(phase + i));
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            
+            ctx.fillStyle = `rgba(255, ${200 + Math.sin(phase + i) * 55}, 100, 0.8)`;
+            ctx.beginPath();
+            ctx.arc(x, y, 2 + Math.sin(phase + i), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          
+          ctx.restore();
+          
+          // Gravitational lensing effect
+          ctx.strokeStyle = 'rgba(100, 0, 100, 0.3)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, size * 1.2, 0, Math.PI * 2); // Increased lensing range
+          ctx.stroke();
+          
+          // Additional outer distortion ring
+          ctx.strokeStyle = 'rgba(150, 0, 150, 0.2)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, size * 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      
+      // Update black hole
+      updateBlackHole();
+      
+      // Laser beam effect
+      if (gameState.laserBeam.active && gameState.hasPowerUp('RAPID_FIRE')) {
+        const laserStartX = canvas.width / 2;
+        const laserStartY = canvas.height - 20; // Bottom center with slight offset
+        
+        const gradient = ctx.createLinearGradient(
+          laserStartX, laserStartY,
+          gameState.laserBeam.x, gameState.laserBeam.y
+        );
+        gradient.addColorStop(0, 'rgba(255, 100, 0, 0.8)');
+        gradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.6)');
+        gradient.addColorStop(1, 'rgba(255, 0, 255, 0.4)');
+        
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(laserStartX, laserStartY);
+        ctx.lineTo(gameState.laserBeam.x, gameState.laserBeam.y);
+        ctx.stroke();
+        
+        // Sparkle effects at laser tip
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + 0.2 * Math.sin(time * 0.01 + i)})`;
+          ctx.beginPath();
+          ctx.arc(
+            gameState.laserBeam.x + (Math.random() - 0.5) * 10,
+            gameState.laserBeam.y + (Math.random() - 0.5) * 10,
+            2 + Math.random() * 3,
+            0, Math.PI * 2
+          );
+          ctx.fill();
+        }
+        
+        // Laser origin glow
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(laserStartX, laserStartY, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.arc(laserStartX, laserStartY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // Power-ups
+      for (let i = powerUps.length - 1; i >= 0; i--) {
+        const powerUp = powerUps[i];
+        powerUp.rotationPhase += 0.05;
+        powerUp.pulsePhase += 0.03;
+        powerUp.position.z -= 0.3; // Move toward player slower than asteroids
+        
+        // Remove if too far behind
+        if (powerUp.position.z < camera.position.z - 200) {
+          powerUps.splice(i, 1);
+          continue;
+        }
+        
+        const worldPos = powerUp.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        if (proj) {
+          const scale = projection.scale / worldPos.z;
+          const baseSize = 15;
+          const size = baseSize * scale;
+          const powerUpType = PowerUpTypes[powerUp.type];
+          
+          // Pulsing glow effect
+          const pulse = 0.7 + 0.3 * Math.sin(powerUp.pulsePhase);
+          const rotation = powerUp.rotationPhase;
+          
+          // Outer glow
+          const glowGrad = ctx.createRadialGradient(proj.x, proj.y, 0, proj.x, proj.y, size * 2);
+          glowGrad.addColorStop(0, powerUpType.glow + '60');
+          glowGrad.addColorStop(1, 'transparent');
+          ctx.fillStyle = glowGrad;
+          ctx.globalAlpha = pulse * 0.5;
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y, size * 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          
+          // Main power-up body (rotating hexagon)
+          ctx.save();
+          ctx.translate(proj.x, proj.y);
+          ctx.rotate(rotation);
+          
+          // Hexagon shape
+          ctx.beginPath();
+          for (let j = 0; j < 6; j++) {
+            const angle = (j * Math.PI) / 3;
+            const x = Math.cos(angle) * size;
+            const y = Math.sin(angle) * size;
+            if (j === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          
+          // Fill with gradient
+          const powerUpGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+          powerUpGrad.addColorStop(0, powerUpType.color + 'ff');
+          powerUpGrad.addColorStop(1, powerUpType.color + '44');
+          ctx.fillStyle = powerUpGrad;
+          ctx.fill();
+          
+          // Border
+          ctx.strokeStyle = powerUpType.color;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          ctx.restore();
+          
+          // Power-up icon/symbol (more transparent)
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.font = `${Math.max(12, size * 0.8)}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(powerUpType.icon, proj.x, proj.y);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          
+          // Targeting overlay
+          if (powerUp.isHovered) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y, size * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Power-up name
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(powerUpType.name, proj.x, proj.y - size * 2);
+            ctx.textAlign = 'left';
+          }
+        }
+      }
+      
+      // Minable Planets (act like asteroids)
+      for (let i = minablePlanets.length - 1; i >= 0; i--) {
+        const planet = minablePlanets[i];
+        planet.pulsePhase += 0.03;
+        planet.position.z -= 0.4; // Move toward player like asteroids
+        
+        // Check if planet passed the player (shield damage)
+        if (planet.position.z < camera.position.z - 100 && gameState.gameActive) {
+          handleShieldDamage();
+          minablePlanets.splice(i, 1);
+          spawnMinablePlanet();
+          continue;
+        }
+        
+        // Respawn if too far ahead
+        if (planet.position.z < camera.position.z - 200) {
+          planet.position.z = camera.position.z + 600 + Math.random() * 400;
+          planet.position.x = (Math.random() - 0.5) * 600;
+          planet.position.y = (Math.random() - 0.5) * 600;
+        }
+        
+        const worldPos = planet.position.subtract(camera.position);
+        const p = project3D(worldPos);
+        if (p) {
+          const scale = projection.scale / worldPos.z;
+          const size = planet.size * scale;
+          const pulse = 0.8 + 0.2 * Math.sin(planet.pulsePhase);
+          
+          // Planet body with pulsing glow
+          const grad = ctx.createRadialGradient(p.x - size * 0.3, p.y - size * 0.3, 0, p.x, p.y, size);
+          grad.addColorStop(0, planet.color.replace('60%', '80%'));
+          grad.addColorStop(1, planet.color.replace('60%', '30%'));
+          ctx.fillStyle = grad;
+          ctx.globalAlpha = pulse;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          
+          // Mining glow effect
+          ctx.strokeStyle = planet.color.replace('60%', '90%');
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = pulse * 0.8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size * 1.2, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          
+          // Rings if present
+          if (planet.rings) {
+            ctx.strokeStyle = planet.color.replace('60%', '50%');
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.7;
+            for (let r = 1.4; r < 2.0; r += 0.15) {
+              ctx.beginPath();
+              ctx.ellipse(p.x, p.y, size * r, size * r * 0.3, 0, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+          }
+          
+          // Targeting overlay
+          if (planet.isHovered) {
+            const screenSize = Math.max(25, (planet.size * 20) / worldPos.z);
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, screenSize, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.beginPath();
+            ctx.moveTo(p.x - 12, p.y);
+            ctx.lineTo(p.x + 12, p.y);
+            ctx.moveTo(p.x, p.y - 12);
+            ctx.lineTo(p.x, p.y + 12);
+            ctx.stroke();
+            
+            // +50 indicator (positioned lower)
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
+            ctx.font = '14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('+50', p.x, p.y + 40);
+            ctx.textAlign = 'left';
+          }
+        }
+      }
+      
+      // UFOs
+      for (let i = ufos.length - 1; i >= 0; i--) {
+        const ufo = ufos[i];
+        ufo.position = ufo.position.add(ufo.velocity);
+        ufo.lightPhase += 0.1;
+        
+        // Remove if too far off screen or behind camera
+        if (Math.abs(ufo.position.x) > 600 || ufo.position.z < camera.position.z - 200) {
+          ufos.splice(i, 1);
+          continue;
+        }
+        
+        const worldPos = ufo.position.subtract(camera.position);
+        const proj = project3D(worldPos);
+        if (proj) {
+          const scale = projection.scale / worldPos.z;
+          const size = ufo.size * scale;
+          
+          // UFO body (saucer shape)
+          const grad = ctx.createRadialGradient(proj.x, proj.y - size * 0.3, 0, proj.x, proj.y, size);
+          grad.addColorStop(0, 'rgba(200, 200, 255, 0.8)');
+          grad.addColorStop(1, 'rgba(100, 100, 200, 0.3)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.ellipse(proj.x, proj.y, size, size * 0.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Blinking lights
+          const lightIntensity = 0.5 + 0.5 * Math.sin(ufo.lightPhase);
+          ctx.fillStyle = `rgba(255, 255, 0, ${lightIntensity})`;
+          ctx.beginPath();
+          ctx.arc(proj.x - size * 0.6, proj.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(proj.x + size * 0.6, proj.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(proj.x, proj.y - size * 0.2, 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Targeting overlay (warning for penalty)
+          if (ufo.isHovered) {
+            const screenSize = Math.max(20, (ufo.size * 25) / worldPos.z);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y, screenSize, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.9)';
+            ctx.beginPath();
+            ctx.moveTo(proj.x - 10, proj.y);
+            ctx.lineTo(proj.x + 10, proj.y);
+            ctx.moveTo(proj.x, proj.y - 10);
+            ctx.lineTo(proj.x, proj.y + 10);
+            ctx.stroke();
+            
+            // -100 warning
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.9)';
+            ctx.font = '14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('-100', proj.x, proj.y - 25);
+            ctx.textAlign = 'left';
+          }
+        }
+      }
+      
+      // Asteroids
+      for (let i = asteroids.length - 1; i >= 0; i--) {
+        const ast = asteroids[i];
+        ast.currentRotation.x += ast.rotation.x;
+        ast.currentRotation.y += ast.rotation.y;
+        ast.currentRotation.z += ast.rotation.z;
+        ast.position.z -= 0.4;
+        
+        // Check for shield damage
+        if (ast.position.z < camera.position.z - 100 && gameState.gameActive) {
+          handleShieldDamage();
+          asteroids.splice(i, 1);
+          spawnAsteroid();
+          continue;
+        }
+        
+        // Respawn if too far
+        if (ast.position.z < camera.position.z - 200) {
+          ast.position.z = camera.position.z + 600 + Math.random() * 400;
+          ast.position.x = (Math.random() - 0.5) * 600;
+          ast.position.y = (Math.random() - 0.5) * 600;
+        }
+        
+        // Render asteroid
+        const vertices = [];
+        ast.vertices.forEach(v => {
+          let p = v.multiply(ast.scale);
+          p = rotateX(p, ast.currentRotation.x);
+          p = rotateY(p, ast.currentRotation.y);
+          p = rotateZ(p, ast.currentRotation.z);
+          p = p.add(ast.position).subtract(camera.position);
+          const proj = project3D(p);
+          if (proj) vertices.push(proj);
+        });
+        
+        if (vertices.length > 2) {
+          const distance = ast.position.subtract(camera.position).length();
+          const alpha = Math.max(0.4, 1 - distance / 250);
+          const intensity = ast.isHovered ? 1.3 : 1.0;
+          
+          const grad = ctx.createRadialGradient(vertices[0].x, vertices[0].y, 0, vertices[0].x, vertices[0].y, 250);
+          grad.addColorStop(0, `rgba(${255 * intensity}, ${220 * intensity}, ${180 * intensity}, ${alpha})`);
+          grad.addColorStop(0.5, `rgba(${180 * intensity}, ${255 * intensity}, ${255 * intensity}, ${alpha * 0.8})`);
+          grad.addColorStop(1, `rgba(0, ${255 * intensity}, ${128 * intensity}, ${alpha * 0.1})`);
+          
+          ctx.lineWidth = Math.max(2, 6 - distance / 80);
+          
+          // Targeting overlay
+          if (ast.isHovered) {
+            const worldPos = ast.position.subtract(camera.position);
+            const proj = project3D(worldPos);
+            if (proj) {
+              const screenSize = Math.max(25, (ast.scale * 15) / proj.z);
+              ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.arc(proj.x, proj.y, screenSize, 0, Math.PI * 2);
+              ctx.stroke();
+              
+              ctx.strokeStyle = 'rgba(255, 255, 0, 0.9)';
+              ctx.beginPath();
+              ctx.moveTo(proj.x - 10, proj.y);
+              ctx.lineTo(proj.x + 10, proj.y);
+              ctx.moveTo(proj.x, proj.y - 10);
+              ctx.lineTo(proj.x, proj.y + 10);
+              ctx.stroke();
+              
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+              ctx.beginPath();
+              ctx.arc(proj.x, proj.y, 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+          
+          // Draw asteroid wireframe
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = Math.max(2, 6 - distance / 80);
+          ctx.beginPath();
+          for (let j = 0; j < vertices.length; j++) {
+            const v1 = vertices[j];
+            const v2 = vertices[(j + 1) % vertices.length];
+            ctx.moveTo(v1.x, v1.y);
+            ctx.lineTo(v2.x, v2.y);
+          }
+          for (let j = 0; j < vertices.length; j += 2) {
+            const v1 = vertices[j];
+            const v2 = vertices[(j + 3) % vertices.length];
+            ctx.moveTo(v1.x, v1.y);
+            ctx.lineTo(v2.x, v2.y);
+          }
+          ctx.stroke();
+        }
+      }
+      
+      // Update game state timers
+      gameState.updateTimers();
+      
+      // Move camera (continue even during game over for background effect)
+      camera.position.z += 0.4;
+      
+      // Danger overlay (only during active game) - keep red screen at critical hull
+      if (gameState.gameActive && gameState.shield <= 33) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${(34 - gameState.shield) * 0.01})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Show hull breach warning only once when reaching last shield
+        if (gameState.shield <= 33 && !gameState.hullWarningShown) {
+          gameState.showWarning('', 'hull-breach');
+          gameState.hullWarningShown = true;
+        }
+      }
+      
+      // Score flash overlay (positioned lower to avoid power-up UI)
+      if (gameState.scoreFlash && gameState.gameActive) {
+        const alpha = Math.min(0.6, gameState.scoreFlashTimer / 400);
+        const isPositive = gameState.scoreFlash.startsWith('+');
+        ctx.fillStyle = isPositive ? 
+          `rgba(0, 255, 100, ${alpha})` : 
+          `rgba(255, 100, 100, ${alpha})`;
+        ctx.font = '20px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(gameState.scoreFlash, canvas.width / 2, 120); // Moved down from 80
+        ctx.textAlign = 'left';
+      }
+      
+      requestAnimationFrame(render);
+    }
+    
+    let isMouseDown = false;
+    let currentMouseX = 0;
+    let currentMouseY = 0;
+    
+    // Event handlers
+    canvas.addEventListener('mousedown', (e) => {
+      if (!gameState.gameActive) return;
+      isMouseDown = true;
+      const rect = canvas.getBoundingClientRect();
+      currentMouseX = e.clientX - rect.left;
+      currentMouseY = e.clientY - rect.top;
+      
+      if (gameState.hasPowerUp('RAPID_FIRE')) {
+        updateLaserBeam(currentMouseX, currentMouseY);
+      } else {
+        checkObjectClick(currentMouseX, currentMouseY);
+      }
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+      isMouseDown = false;
+      if (gameState.laserBeam.active) {
+        gameState.laserBeam.active = false;
+        audioEngine.stopLaserSound();
+      }
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (!gameState.gameActive) return;
+      const rect = canvas.getBoundingClientRect();
+      currentMouseX = e.clientX - rect.left;
+      currentMouseY = e.clientY - rect.top;
+      
+      if (isMouseDown && gameState.hasPowerUp('RAPID_FIRE')) {
+        updateLaserBeam(currentMouseX, currentMouseY);
+      } else {
+        checkObjectHover(currentMouseX, currentMouseY);
+      }
+    });
+    
+    canvas.addEventListener('touchstart', (e) => {
+      if (!gameState.gameActive) return;
+      e.preventDefault();
+      isMouseDown = true;
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      currentMouseX = touch.clientX - rect.left;
+      currentMouseY = touch.clientY - rect.top;
+      
+      if (gameState.hasPowerUp('RAPID_FIRE')) {
+        updateLaserBeam(currentMouseX, currentMouseY);
+      } else {
+        checkObjectClick(currentMouseX, currentMouseY);
+      }
+    });
+    
+    canvas.addEventListener('touchend', () => {
+      isMouseDown = false;
+      if (gameState.laserBeam.active) {
+        gameState.laserBeam.active = false;
+        audioEngine.stopLaserSound();
+      }
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+      if (!gameState.gameActive) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      currentMouseX = touch.clientX - rect.left;
+      currentMouseY = touch.clientY - rect.top;
+      
+      if (isMouseDown && gameState.hasPowerUp('RAPID_FIRE')) {
+        updateLaserBeam(currentMouseX, currentMouseY);
+      }
+    });
+    
+    // Game initialization
+    async function startGame() {
+      const overlay = document.getElementById('startOverlay');
+      const gameOverScreen = document.getElementById('gameOverScreen');
+      const gameOverContent = document.getElementById('gameOverContent');
+      const warningOverlay = document.getElementById('warningOverlay');
+      
+      overlay.style.display = 'none';
+      gameOverScreen.style.display = 'none';
+      gameOverScreen.classList.remove('fade-in');
+      gameOverContent.classList.remove('show');
+      
+      // Hide any active warnings
+      if (warningOverlay) {
+        warningOverlay.style.display = 'none';
+        const warningContent = document.getElementById('warningContent');
+        if (warningContent) {
+          warningContent.classList.remove('show');
+        }
+      }
+      
+      const audioInitialized = await audioEngine.initialize();
+      if (!audioInitialized) {
+        console.warn('Audio initialization failed, continuing without audio');
+      }
+      
+      // Stop any active laser sound
+      audioEngine.stopLaserSound();
+      audioEngine.stopBlackHoleSound();
+      
+      gameState.reset();
+      
+      // Ensure power-up display is cleared
+      const powerUpDisplay = document.getElementById('powerUpDisplay');
+      if (powerUpDisplay) {
+        powerUpDisplay.innerHTML = '';
+      }
+      asteroids.length = 0;
+      particles.length = 0;
+      minablePlanets.length = 0;
+      ufos.length = 0;
+      powerUps.length = 0;
+      
+      resizeCanvas();
+      initializeBackground();
+      
+      // Spawn initial objects
+      for (let i = 0; i < 8; i++) {
+        spawnAsteroid();
+      }
+      
+      // Rarely spawn an initial minable planet
+      if (Math.random() < 0.1) {
+        spawnMinablePlanet();
+      }
+      
+      // Spawn initial UFO
+      spawnUFO();
+      
+      audioEngine.randomizeSettings();
+      audioEngine.startScheduler();
+      
+      // Start periodic spawning
+      startPeriodicSpawning();
+      
+      render();
+    }
+    
+    let spawnIntervals = [];
+    
+    function startPeriodicSpawning() {
+      // Clear any existing intervals
+      spawnIntervals.forEach(interval => clearInterval(interval));
+      spawnIntervals = [];
+      
+      // Spawn minable planets very rarely
+      spawnIntervals.push(setInterval(() => {
+        if (gameState.gameActive && Math.random() < 0.01369) { // Very rare - only 8% chance
+          spawnMinablePlanet();
+        }
+      }, 1369)); // Every 20 seconds instead of 15
+      
+      // Spawn UFOs occasionally
+      spawnIntervals.push(setInterval(() => {
+        if (gameState.gameActive && Math.random() < 0.5) {
+          spawnUFO();
+        }
+      }, 5000)); // Slightly more frequent UFOs
+      
+      // Spawn power-ups rarely
+      spawnIntervals.push(setInterval(() => {
+        if (gameState.gameActive && Math.random() < 0.1369) { // 30% chance
+          spawnPowerUp();
+        }
+      }, 1369)); // Every 12 seconds
+      
+      // Spawn black hole more frequently
+      spawnIntervals.push(setInterval(() => {
+        if (gameState.gameActive && Math.random() < 0.01369) { // 10% chance
+          spawnBlackHole();
+        }
+      }, 1369)); // Check every 25 seconds
+    }
+    
+    function stopPeriodicSpawning() {
+      spawnIntervals.forEach(interval => clearInterval(interval));
+      spawnIntervals = [];
+    }
+    
+    // Start overlay handler
+    document.getElementById('startOverlay').addEventListener('click', startGame);
+    
+    // Game over screen handler
+    document.getElementById('gameOverScreen').addEventListener('click', startGame);
+    
+    // Window resize handler
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      audioEngine.cleanup();
+      stopPeriodicSpawning();
+    });
+    
+    // Initial setup
+    resizeCanvas();
+  </script>
+</body>
+</html>
